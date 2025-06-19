@@ -78,8 +78,7 @@ void init_hardware() {
 }
 
 // Função para ler o ADC
-uint16_t read_water_level(uint pin) {
-    adc_select_input(pin);
+uint16_t read_water_level() {
     return adc_read();
 }
 
@@ -180,12 +179,13 @@ void print_system_status(uint16_t water_level) {
 void update_display(uint16_t water_level, bool pump_state) {
     char buffer[32];
     char estado[32];
+    float water_level_float = (float)water_level / 4095.0 * 100.0; // Convertendo ADC para porcentagem
     ssd1306_fill(&oled, false);
     
     snprintf(buffer, sizeof(buffer), "Nivel de agua");
     ssd1306_draw_string(&oled, buffer, 1, 8);
     
-    snprintf(buffer, sizeof(buffer), "%.2f %", (water_level/4095)*100);
+    snprintf(buffer, sizeof(buffer), "%.2f%%", water_level_float);
     ssd1306_draw_string(&oled, buffer, 1, 24);
     
     snprintf(buffer, sizeof(buffer), "Estado da Bomba");
@@ -211,7 +211,7 @@ int main() {
     // Loop principal
     while (true) {
         // Ler nível de água
-        water_level_adc = read_water_level(WATER_LEVEL_ADC_PIN);
+        water_level_adc = read_water_level();
         
         // Tratar botão
         handle_button();
