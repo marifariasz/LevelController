@@ -10,16 +10,16 @@ set(PICO_BOARD pico_w CACHE STRING "Board type")
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
 
-project(Teste_Controle_Nivel C CXX ASM)
+project(LevelController C CXX ASM)
 
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(${PROJECT_NAME} Teste_Controle_Nivel.c )
+add_executable(${PROJECT_NAME} LevelController.c )
 
-pico_set_program_name(${PROJECT_NAME} "Teste_Controle_Nivel")
+pico_set_program_name(${PROJECT_NAME} "LevelController")
 pico_set_program_version(${PROJECT_NAME} "0.1")
 
 # Modify the below lines to enable/disable output over UART/USB
