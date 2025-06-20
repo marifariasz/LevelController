@@ -9,8 +9,8 @@
 #include "web_site.h"
 
 // Configurações de WiFi
-#define WIFI_SSID "ArcherC50 2.4G"
-#define WIFI_PASS "mb17012019"
+#define WIFI_SSID "SEU SSID"
+#define WIFI_PASS "SUA SENHA"
 
 // Variáveis globais para armazenar o nível de água e estado da bomba
 uint16_t nivel;
