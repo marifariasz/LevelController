@@ -9,16 +9,24 @@
 #include "pico/cyw43_arch.h"
 #include "lwip/tcp.h"
 #include "web_site.h"
+#include "hardware/pwm.h"      // Modulação por largura de pulso (PWM) para buzzer
+#include "hardware/clocks.h"   // Controle de clocks do sistema
+#include "ws2818b.pio.h"       // Programa PIO para controlar LEDs WS2812B
+#include "hardware/pio.h"      // Interface para Programmable I/O (PIO)
 
 // Definições dos pinos
-#define WATER_LEVEL_ADC_PIN 28      // ADC
+#define WATER_LEVEL_ADC_PIN 26     // ADC
 #define PUMP_RELAY_PIN 16           // Relé da bomba
 #define RED_LED_PIN 13              
 #define GREEN_LED_PIN 11            
 #define PUSH_BUTTON_PIN 6     
 #define OLED_I2C_SDA_PIN 15         // SDA do OLED  
 #define OLED_I2C_SCL_PIN 14         // SCL do OLED  
-#define I2C_OLED_PORT i2c1  
+#define I2C_OLED_PORT i2c1 
+#define BUZZER 21
+#define LED_PIN 7              // Pino para matriz de LEDs WS2812B
+uint sm;                           // Máquina de estado do PIO para LEDs
+#define LED_COUNT 25               // Número total de LEDs na matriz 5x5
 
 // Constantes do sistema
 #define DEBOUNCE_TIME_MS 200         // Tempo de debounce do botão
@@ -36,6 +44,132 @@ absolute_time_t last_button_time;
 uint16_t water_level_adc = 0;          // Variável nível
 ssd1306_t oled;
 
+
+// Funções para a matriz de leds
+
+// Estrutura para representar um pixel RGB na matriz de LEDs
+struct pixel_t {
+    uint8_t G, R, B;           // Componentes de cor: verde, vermelho, azul
+};
+typedef struct pixel_t pixel_t;
+typedef pixel_t npLED_t;       // Tipo para LEDs NeoPixel (WS2812B)
+
+// Variáveis globais para controle da matriz de LEDs
+npLED_t leds[LED_COUNT];       // Array que armazena o estado de cada LED
+PIO np_pio;                    // Instância do PIO para controlar a matriz
+void npDisplayDigit(int digit);
+// Matrizes que definem os padrões de exibição na matriz de LEDs (5x5 pixels)
+const uint8_t digits[5][5][5][3] = {
+    // Situação 1: nível mínimo
+    {
+        {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}},
+        {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}},
+        {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}},
+        {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}},
+        {{0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}}
+    },
+    // Situação 2
+    {
+        {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}},
+        {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}},
+        {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}},
+        {{0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}},
+        {{0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}}
+    },
+    // Situação 3
+    {
+        {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}},
+        {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}},
+        {{0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}},
+        {{0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}},
+        {{0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}}
+    },
+    // Situação 4
+    {
+        {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}},
+        {{0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}},
+        {{0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}},
+        {{0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}},
+        {{0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}}
+    },
+    // Situação 5: nível máximo
+    {
+        {{0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}},
+        {{0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}},
+        {{0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}},
+        {{0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}},
+        {{0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}, {0, 0, 100}}
+    }
+};
+
+// Define as cores de um LED na matriz
+void npSetLED(uint index, uint8_t r, uint8_t g, uint8_t b) {
+    leds[index].R = r; // Componente vermelho
+    leds[index].G = g; // Componente verde
+    leds[index].B = b; // Componente azul
+}
+
+// Limpa a matriz de LEDs, exibindo o padrão de dígito 4 (padrão para limpar)
+void npClear() {
+    npDisplayDigit(5);
+}
+
+// Inicializa a matriz de LEDs WS2812B usando o PIO
+void npInit(uint pin) {
+    uint offset = pio_add_program(pio0, &ws2818b_program); // Carrega programa PIO
+    np_pio = pio0; // Usa PIO0
+    sm = pio_claim_unused_sm(np_pio, true); // Reserva uma máquina de estado
+    ws2818b_program_init(np_pio, sm, offset, pin, 800000.f); // Inicializa PIO
+    npClear(); // Limpa a matriz ao inicializar
+}
+
+// Escreve os dados dos LEDs na matriz
+void npWrite() {
+    for (uint i = 0; i < LED_COUNT; i++) {
+        pio_sm_put_blocking(np_pio, sm, leds[i].G); // Envia componente verde
+        pio_sm_put_blocking(np_pio, sm, leds[i].R); // Envia componente vermelho
+        pio_sm_put_blocking(np_pio, sm, leds[i].B); // Envia componente azul
+    }
+    sleep_us(100); // Pequeno atraso para estabilizar a comunicação
+}
+
+// Calcula o índice de um LED na matriz com base nas coordenadas (x, y)
+int getIndex(int x, int y) {
+    if (y % 2 == 0) {
+        return 24 - (y * 5 + x); // Linhas pares: ordem direta
+    } else {
+        return 24 - (y * 5 + (4 - x)); // Linhas ímpares: ordem invertida
+    }
+}
+
+// Exibe um dígito ou padrão na matriz de LEDs
+void npDisplayDigit(int digit) {
+    for (int coluna = 0; coluna < 5; coluna++) {
+        for (int linha = 0; linha < 5; linha++) {
+            int posicao = getIndex(linha, coluna); // Calcula índice do LED
+            npSetLED(posicao, digits[digit][coluna][linha][0], // Componente R
+                              digits[digit][coluna][linha][1], // Componente G
+                              digits[digit][coluna][linha][2]); // Componente B
+        }
+    }
+    npWrite(); // Atualiza a matriz com os novos dados
+}
+
+// Função para o Buzzer
+// Toca um som no buzzer com frequência e duração especificadas
+void play_buzzer(uint pin, uint frequency, uint duration_ms) {
+    gpio_set_function(pin, GPIO_FUNC_PWM); // Configura o pino como PWM
+    uint slice_num = pwm_gpio_to_slice_num(pin); // Obtém o slice PWM
+    pwm_config config = pwm_get_default_config(); // Carrega configuração padrão
+    // Ajusta o divisor de clock para atingir a frequência desejada
+    pwm_config_set_clkdiv(&config, clock_get_hz(clk_sys) / (frequency * 4096));
+    pwm_init(slice_num, &config, true); // Inicializa o PWM
+    pwm_set_gpio_level(pin, 2048); // Define duty cycle (~50%)
+    sleep_ms(duration_ms); // Aguarda a duração do som
+    pwm_set_gpio_level(pin, 0); // Desliga o buzzer
+    pwm_set_enabled(slice_num, false); // Desativa o PWM
+}
+
 // Inicializando
 void init_hardware() {
     // Inicializar stdio
@@ -51,8 +185,8 @@ void init_hardware() {
     // Configurar ADC
     adc_init();
     adc_gpio_init(WATER_LEVEL_ADC_PIN);
-    adc_select_input(2); // ADC1 (GPIO 28)
-    
+    //adc_select_input(2); // ADC1 (GPIO 28)
+    adc_select_input(0); // Seleciona canal ADC0
     // Configurar GPIO
     gpio_init(PUMP_RELAY_PIN);
     gpio_set_dir(PUMP_RELAY_PIN, GPIO_OUT);
@@ -69,6 +203,9 @@ void init_hardware() {
     gpio_init(PUSH_BUTTON_PIN);
     gpio_set_dir(PUSH_BUTTON_PIN, GPIO_IN);
     gpio_pull_up(PUSH_BUTTON_PIN);
+
+    gpio_init(BUZZER);
+    gpio_set_dir(BUZZER, GPIO_OUT);
     
     // Inicializar tempo
     last_button_time = get_absolute_time();
@@ -108,6 +245,39 @@ void control_leds(uint16_t water_level) {
         gpio_put(GREEN_LED_PIN, 0);
     }
 }
+
+
+// Função para controlar matriz de leds e o buzzer
+
+
+void control_buzzer_matrix(uint16_t water_level) {
+    if (!leds_enabled) {
+        // Se os LEDs estão desabilitados, apagar ambos
+        npClear();
+    }
+    if (water_level < WATER_LEVEL_MIN_THRESHOLD) {
+        // Nível abaixo do mínimo - LED vermelho ligado, verde apagado
+        npDisplayDigit(0);
+    } else if (water_level >= WATER_LEVEL_MIN_THRESHOLD && water_level < 1200) {
+        // Nível entre mínimo e máximo - LED verde ligado, vermelho apagado
+        npDisplayDigit(1);
+
+    }else if (water_level >= WATER_LEVEL_MIN_THRESHOLD && water_level < 2000) {
+        // Nível entre mínimo e máximo - LED verde ligado, vermelho apagado
+        npDisplayDigit(2);
+
+    }else if (water_level >= WATER_LEVEL_MIN_THRESHOLD && water_level <2600) {
+        // Nível entre mínimo e máximo - LED verde ligado, vermelho apagado
+        npDisplayDigit(3);
+    } 
+    else {
+        // Nível no máximo ou acima - ambos LEDs apagados
+        npDisplayDigit(4);
+        play_buzzer(BUZZER, 3000, 100);
+
+    }
+}
+
 
 // Função para controlar a bomba
 void control_pump(uint16_t water_level) {
@@ -218,6 +388,7 @@ void update() //função para atualizar o web site
 int main() {
     // Inicializar hardware
     init_hardware();
+    npInit(LED_PIN);
     
     printf("Sistema iniciado com sucesso!\n");
     printf("Thresholds configurados - Min: %d, Max: %d\n", 
@@ -239,6 +410,9 @@ int main() {
         
         // Controlar LEDs
         control_leds(water_level_adc);
+
+        // Controlar matriz de leds e o buzzer
+        control_buzzer_matrix(water_level_adc);
         
         // Exibir status
         print_system_status(water_level_adc);
