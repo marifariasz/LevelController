@@ -15,7 +15,7 @@
 #include "hardware/pio.h"      // Interface para Programmable I/O (PIO)
 
 // Definições dos pinos
-#define WATER_LEVEL_ADC_PIN 26     // ADC
+#define WATER_LEVEL_ADC_PIN 28     // ADC
 #define PUMP_RELAY_PIN 16           // Relé da bomba
 #define RED_LED_PIN 13              
 #define GREEN_LED_PIN 11            
@@ -185,8 +185,8 @@ void init_hardware() {
     // Configurar ADC
     adc_init();
     adc_gpio_init(WATER_LEVEL_ADC_PIN);
-    //adc_select_input(2); // ADC1 (GPIO 28)
-    adc_select_input(0); // Seleciona canal ADC0
+    adc_select_input(2); // ADC1 (GPIO 28)
+    
     // Configurar GPIO
     gpio_init(PUMP_RELAY_PIN);
     gpio_set_dir(PUMP_RELAY_PIN, GPIO_OUT);
