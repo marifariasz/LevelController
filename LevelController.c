@@ -2,14 +2,20 @@
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "hardware/adc.h"
+#include "hardware/i2c.h"
 #include "pico/time.h"
+#include "lib/ssd1306.h"
+#include "lib/font.h"
 
 // Definições dos pinos
 #define WATER_LEVEL_ADC_PIN 28      // ADC
 #define PUMP_RELAY_PIN 16           // Relé da bomba
 #define RED_LED_PIN 13              
 #define GREEN_LED_PIN 11            
-#define PUSH_BUTTON_PIN 6           
+#define PUSH_BUTTON_PIN 6     
+#define OLED_I2C_SDA_PIN 15         // SDA do OLED  
+#define OLED_I2C_SCL_PIN 14         // SCL do OLED  
+#define I2C_OLED_PORT i2c1  
 
 // Definições dos thresholds (valores ADC de 0-4095)
 #define WATER_LEVEL_MIN_THRESHOLD 1000   // Nível mínimo
@@ -25,12 +31,20 @@ bool pump_active = false;              // Estado da bomba
 bool button_last_state = false;        // Último estado do botão
 absolute_time_t last_button_time;      
 uint16_t water_level_adc = 0;          // Variável nível
+ssd1306_t oled;
 
 // Inicializando
 void init_hardware() {
     // Inicializar stdio
     stdio_init_all();
     
+    // Configurar I2C
+    i2c_init(I2C_OLED_PORT, 400000);
+    gpio_set_function(OLED_I2C_SDA_PIN, GPIO_FUNC_I2C);
+    gpio_set_function(OLED_I2C_SCL_PIN, GPIO_FUNC_I2C);
+    gpio_pull_up(OLED_I2C_SDA_PIN);
+    gpio_pull_up(OLED_I2C_SCL_PIN);
+
     // Configurar ADC
     adc_init();
     adc_gpio_init(WATER_LEVEL_ADC_PIN);
@@ -56,6 +70,11 @@ void init_hardware() {
     // Inicializar tempo
     last_button_time = get_absolute_time();
     
+    // Inicializar OLED
+    ssd1306_init(&oled, 128, 64, false, 0x3C, I2C_OLED_PORT);
+    ssd1306_config(&oled);
+    ssd1306_fill(&oled, false);
+    ssd1306_send_data(&oled);
 }
 
 // Função para ler o ADC
@@ -157,6 +176,29 @@ void print_system_status(uint16_t water_level) {
     }
 }
 
+void update_display(uint16_t water_level, bool pump_state) {
+    char buffer[32];
+    char estado[32];
+    float water_level_float = (float)water_level / 4095.0 * 100.0; // Convertendo ADC para porcentagem
+    ssd1306_fill(&oled, false);
+    
+    snprintf(buffer, sizeof(buffer), "Nivel de agua");
+    ssd1306_draw_string(&oled, buffer, 1, 8);
+    
+    snprintf(buffer, sizeof(buffer), "%.2f%%", water_level_float);
+    ssd1306_draw_string(&oled, buffer, 1, 24);
+    
+    snprintf(buffer, sizeof(buffer), "Estado da Bomba");
+    ssd1306_draw_string(&oled, buffer, 1, 40);
+    if (pump_state){
+        snprintf(buffer, sizeof(buffer), "Ligada");
+    } else{
+        snprintf(buffer, sizeof(buffer), "Desligada");
+    }
+    ssd1306_draw_string(&oled, buffer, 1, 54);
+    ssd1306_send_data(&oled);
+}
+
 // Função principal
 int main() {
     // Inicializar hardware
@@ -182,7 +224,10 @@ int main() {
         
         // Exibir status
         print_system_status(water_level_adc);
-        
+
+        // Atualiza o display OLED
+        update_display(water_level_adc, pump_active);
+
         // Aguardar antes da próxima leitura
         sleep_ms(SAMPLE_INTERVAL_MS);
     }
