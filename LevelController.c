@@ -6,6 +6,9 @@
 #include "pico/time.h"
 #include "lib/ssd1306.h"
 #include "lib/font.h"
+#include "pico/cyw43_arch.h"
+#include "lwip/tcp.h"
+#include "web_site.h"
 
 // Definições dos pinos
 #define WATER_LEVEL_ADC_PIN 28      // ADC
@@ -17,13 +20,13 @@
 #define OLED_I2C_SCL_PIN 14         // SCL do OLED  
 #define I2C_OLED_PORT i2c1  
 
-// Definições dos thresholds (valores ADC de 0-4095)
-#define WATER_LEVEL_MIN_THRESHOLD 1000   // Nível mínimo
-#define WATER_LEVEL_MAX_THRESHOLD 3000   // Nível máximo
-
 // Constantes do sistema
 #define DEBOUNCE_TIME_MS 200         // Tempo de debounce do botão
 #define SAMPLE_INTERVAL_MS 100      // Intervalo entre leituras do ADC
+
+// Definições dos thresholds (valores ADC)
+uint16_t WATER_LEVEL_MIN_THRESHOLD = 1000; // Nível mínimo
+uint16_t WATER_LEVEL_MAX_THRESHOLD = 3000; // Nível máximo
 
 // Variáveis globais do sistema
 bool leds_enabled = true;              // Estado dos LEDs
@@ -199,6 +202,18 @@ void update_display(uint16_t water_level, bool pump_state) {
     ssd1306_send_data(&oled);
 }
 
+void update() //função para atualizar o web site
+{
+    update_web_site(water_level_adc, pump_active);
+    if (nivelConfig.min != WATER_LEVEL_MIN_THRESHOLD || nivelConfig.max != WATER_LEVEL_MAX_THRESHOLD)
+    {
+        WATER_LEVEL_MIN_THRESHOLD = nivelConfig.min;
+        WATER_LEVEL_MAX_THRESHOLD = nivelConfig.max;
+        printf("Minimo: %d\n",WATER_LEVEL_MIN_THRESHOLD);
+        printf("Maximo: %d\n",WATER_LEVEL_MAX_THRESHOLD);
+    }
+}
+
 // Função principal
 int main() {
     // Inicializar hardware
@@ -207,6 +222,9 @@ int main() {
     printf("Sistema iniciado com sucesso!\n");
     printf("Thresholds configurados - Min: %d, Max: %d\n", 
            WATER_LEVEL_MIN_THRESHOLD, WATER_LEVEL_MAX_THRESHOLD);
+    
+    //iniciar web
+    init_web_site();
     
     // Loop principal
     while (true) {
@@ -227,6 +245,9 @@ int main() {
 
         // Atualiza o display OLED
         update_display(water_level_adc, pump_active);
+
+        //atualiza dados do web site
+        update();
 
         // Aguardar antes da próxima leitura
         sleep_ms(SAMPLE_INTERVAL_MS);
