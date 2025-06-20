@@ -9,7 +9,7 @@
 #include "web_site.h"
 
 // Configurações de WiFi
-#define WIFI_SSID "SEU SSID"
+#define WIFI_SSID "SEU WIFI"
 #define WIFI_PASS "SUA SENHA"
 
 // Variáveis globais para armazenar o nível de água e estado da bomba
