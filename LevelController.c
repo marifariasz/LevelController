@@ -202,7 +202,7 @@ void update_display(uint16_t water_level, bool pump_state) {
     ssd1306_send_data(&oled);
 }
 
-void update() //função para atualizar o web site
+void update_web() //função para atualizar o web site
 {
     update_web_site(water_level_adc, pump_active);
     if (nivelConfig.min != WATER_LEVEL_MIN_THRESHOLD || nivelConfig.max != WATER_LEVEL_MAX_THRESHOLD)
@@ -247,7 +247,7 @@ int main() {
         update_display(water_level_adc, pump_active);
 
         //atualiza dados do web site
-        update();
+        update_web();
 
         // Aguardar antes da próxima leitura
         sleep_ms(SAMPLE_INTERVAL_MS);
