@@ -9,15 +9,15 @@
 #include "web_site.h"
 
 // Configurações de WiFi
-#define WIFI_SSID "SEU WIFI"
-#define WIFI_PASS "SUA SENHA"
+#define WIFI_SSID "SEUSSID"
+#define WIFI_PASS "SUASENHA"
 
 // Variáveis globais para armazenar o nível de água e estado da bomba
 uint16_t nivel;
 bool bomba;
 
 // Inicialização da estrutura de configuração dos níveis de água
-struct nivel_agua nivelConfig = {1000, 3000};
+struct nivel_agua nivelConfig = {250, 550};
 
 // Estrutura para armazenar o estado das respostas HTTP
 struct http_state
@@ -172,7 +172,7 @@ void init_web_site()
     }
 
     cyw43_arch_enable_sta_mode();
-    if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASS, CYW43_AUTH_WPA2_AES_PSK, 20000))
+    if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASS, CYW43_AUTH_WPA2_AES_PSK, 30000))
     {
         printf("Erro ao se conectar");
         return;

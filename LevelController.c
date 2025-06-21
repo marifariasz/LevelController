@@ -33,8 +33,8 @@ uint sm;                           // Máquina de estado do PIO para LEDs
 #define SAMPLE_INTERVAL_MS 100      // Intervalo entre leituras do ADC
 
 // Definições dos thresholds (valores ADC)
-uint16_t WATER_LEVEL_MIN_THRESHOLD = 1000; // Nível mínimo
-uint16_t WATER_LEVEL_MAX_THRESHOLD = 3000; // Nível máximo
+uint16_t WATER_LEVEL_MIN_THRESHOLD = 250; // Nível mínimo
+uint16_t WATER_LEVEL_MAX_THRESHOLD = 550; // Nível máximo
 
 // Variáveis globais do sistema
 bool leds_enabled = true;              // Estado dos LEDs
@@ -258,15 +258,15 @@ void control_buzzer_matrix(uint16_t water_level) {
     if (water_level < WATER_LEVEL_MIN_THRESHOLD) {
         // Nível abaixo do mínimo - LED vermelho ligado, verde apagado
         npDisplayDigit(0);
-    } else if (water_level >= WATER_LEVEL_MIN_THRESHOLD && water_level < 1200) {
+    } else if (water_level >= WATER_LEVEL_MIN_THRESHOLD && water_level < 300) {
         // Nível entre mínimo e máximo - LED verde ligado, vermelho apagado
         npDisplayDigit(1);
 
-    }else if (water_level >= WATER_LEVEL_MIN_THRESHOLD && water_level < 2000) {
+    }else if (water_level >= WATER_LEVEL_MIN_THRESHOLD && water_level < 450) {
         // Nível entre mínimo e máximo - LED verde ligado, vermelho apagado
         npDisplayDigit(2);
 
-    }else if (water_level >= WATER_LEVEL_MIN_THRESHOLD && water_level <2600) {
+    }else if (water_level >= WATER_LEVEL_MIN_THRESHOLD && water_level <500) {
         // Nível entre mínimo e máximo - LED verde ligado, vermelho apagado
         npDisplayDigit(3);
     } 
@@ -352,7 +352,7 @@ void print_system_status(uint16_t water_level) {
 void update_display(uint16_t water_level, bool pump_state) {
     char buffer[32];
     char estado[32];
-    float water_level_float = (float)water_level / 4095.0 * 100.0; // Convertendo ADC para porcentagem
+    float water_level_float = ((float)water_level - WATER_LEVEL_MIN_THRESHOLD) / (WATER_LEVEL_MAX_THRESHOLD - WATER_LEVEL_MIN_THRESHOLD) * 100.0; // Convertendo ADC para porcentagem
     ssd1306_fill(&oled, false);
     
     snprintf(buffer, sizeof(buffer), "Nivel de agua");
