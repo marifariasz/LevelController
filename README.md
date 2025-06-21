@@ -35,7 +35,7 @@ O sistema estabelece conexão WiFi e hospeda um servidor web que oferece:
 - Eder Renato 
 - Matheus Pereira
 - Mariana Farias
-- 
+
 ## :bookmark_tabs: Funcionamento do Projeto
 O sistema opera através de várias funções principais organizadas em um loop principal:
 
