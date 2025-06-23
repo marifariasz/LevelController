@@ -60,5 +60,5 @@ O sistema opera através de várias funções principais organizadas em um loop 
 
 ## :arrow_forward: Vídeo no youtube mostrando o funcionamento do programa na placa Raspberry Pi Pico W
 <p align="center">
-    <a href="[LINK_DO_VIDEO]">Clique aqui para acessar o vídeo</a>
+    <a href="https://youtu.be/5r6thUcYris">Clique aqui para acessar o vídeo</a>
 </p>
